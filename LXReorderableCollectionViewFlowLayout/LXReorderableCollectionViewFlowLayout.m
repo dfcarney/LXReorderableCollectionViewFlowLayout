@@ -75,7 +75,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     // Links the default long press gesture recognizer to the custom long press gesture recognizer we are creating now
     // by enforcing failure dependency so that they doesn't clash.
     for (UIGestureRecognizer *gestureRecognizer in self.collectionView.gestureRecognizers) {
-        if ([gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]) {
+        if ([gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]  && gestureRecognizer != _longPressGestureRecognizer) {
             [gestureRecognizer requireGestureRecognizerToFail:_longPressGestureRecognizer];
         }
     }
