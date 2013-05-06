@@ -49,6 +49,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 @interface LXReorderableCollectionViewFlowLayout ()
 
 @property (strong, nonatomic) NSIndexPath *selectedItemIndexPath;
+@property (strong, nonatomic) NSIndexPath *destinationIndexPath;
 @property (strong, nonatomic) UIView *currentView;
 @property (assign, nonatomic) CGPoint currentViewCenter;
 @property (assign, nonatomic) CGPoint panTranslationInCollectionView;
@@ -74,6 +75,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     
     // Links the default long press gesture recognizer to the custom long press gesture recognizer we are creating now
     // by enforcing failure dependency so that they doesn't clash.
+    // In other words, our long-press recognizer takes precedence.
     for (UIGestureRecognizer *gestureRecognizer in self.collectionView.gestureRecognizers) {
         if ([gestureRecognizer isKindOfClass:[UILongPressGestureRecognizer class]]  && gestureRecognizer != _longPressGestureRecognizer) {
             [gestureRecognizer requireGestureRecognizerToFail:_longPressGestureRecognizer];
@@ -111,7 +113,8 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 
 - (void)applyLayoutAttributes:(UICollectionViewLayoutAttributes *)layoutAttributes {
     if ([layoutAttributes.indexPath isEqual:self.selectedItemIndexPath]) {
-        layoutAttributes.hidden = YES;
+        // dfcarney: makes for nicer animation at gesture end
+        // layoutAttributes.hidden = YES;
     }
 }
 
@@ -127,7 +130,8 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     NSIndexPath *newIndexPath = [self.collectionView indexPathForItemAtPoint:self.currentView.center];
     NSIndexPath *previousIndexPath = self.selectedItemIndexPath;
     
-    if ((newIndexPath == nil) || [newIndexPath isEqual:previousIndexPath]) {
+    // dfcarney: we want notifications if we're hovering over our original location
+    if (newIndexPath == nil) { // || [newIndexPath isEqual:previousIndexPath]) {
         return;
     }
     
@@ -136,9 +140,16 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
         return;
     }
     
-    self.selectedItemIndexPath = newIndexPath;
+    self.destinationIndexPath = newIndexPath;
     
+    // dfcarney: don't update it. Instead, track the original indexPath and modify everything after the pan gesture is complete.
+    //self.selectedItemIndexPath = newIndexPath;
+    
+    // dfcarney: this is mostly useless now.
     [self.dataSource collectionView:self.collectionView itemAtIndexPath:previousIndexPath willMoveToIndexPath:newIndexPath];
+    
+    // dfcarney: rely on the collectionView and delegate to sort stuff out.
+    return;
     
     __weak typeof(self) weakSelf = self;
     [self.collectionView performBatchUpdates:^{
@@ -306,8 +317,8 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
             NSIndexPath *currentIndexPath = self.selectedItemIndexPath;
             
             if (currentIndexPath) {
-                if ([self.delegate respondsToSelector:@selector(collectionView:layout:willEndDraggingItemAtIndexPath:)]) {
-                    [self.delegate collectionView:self.collectionView layout:self willEndDraggingItemAtIndexPath:currentIndexPath];
+                if ([self.delegate respondsToSelector:@selector(collectionView:layout:willEndDraggingItemAtIndexPath:to:)]) {
+                    [self.delegate collectionView:self.collectionView layout:self willEndDraggingItemAtIndexPath:currentIndexPath to:self.destinationIndexPath];
                 }
                 
                 self.selectedItemIndexPath = nil;
@@ -317,25 +328,27 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
                 
                 __weak typeof(self) weakSelf = self;
                 [UIView
-                 animateWithDuration:0.3
+                 animateWithDuration:0.0 // dfcarney: was 0.3
                  delay:0.0
                  options:UIViewAnimationOptionBeginFromCurrentState
                  animations:^{
-                     __strong typeof(self) strongSelf = weakSelf;
-                     if (strongSelf) {
-                         strongSelf.currentView.transform = CGAffineTransformMakeScale(1.0f, 1.0f);
-                         strongSelf.currentView.center = layoutAttributes.center;
-                     }
+                     // dfcarney: rely on the collectionView and delegate to animate/redraw things
+                     // __strong typeof(self) strongSelf = weakSelf;
+                     // if (strongSelf) {
+                     //     strongSelf.currentView.transform = CGAffineTransformMakeScale(1.0f, 1.0f);
+                     //     strongSelf.currentView.center = layoutAttributes.center;
+                     // }
                  }
                  completion:^(BOOL finished) {
                      __strong typeof(self) strongSelf = weakSelf;
                      if (strongSelf) {
                          [strongSelf.currentView removeFromSuperview];
                          strongSelf.currentView = nil;
-                         [strongSelf invalidateLayout];
+                         // dfcarney: rely on the collectionView and delegate to animate/redraw things
+                         // [strongSelf invalidateLayout];
                          
-                         if ([strongSelf.delegate respondsToSelector:@selector(collectionView:layout:didEndDraggingItemAtIndexPath:)]) {
-                             [strongSelf.delegate collectionView:strongSelf.collectionView layout:strongSelf didEndDraggingItemAtIndexPath:currentIndexPath];
+                         if ([strongSelf.delegate respondsToSelector:@selector(collectionView:layout:didEndDraggingItemAtIndexPath:to:)]) {
+                             [strongSelf.delegate collectionView:strongSelf.collectionView layout:strongSelf didEndDraggingItemAtIndexPath:currentIndexPath to:self.destinationIndexPath];
                          }
                      }
                  }];
