@@ -255,7 +255,11 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     switch(gestureRecognizer.state) {
         case UIGestureRecognizerStateBegan: {
             NSIndexPath *currentIndexPath = [self.collectionView indexPathForItemAtPoint:[gestureRecognizer locationInView:self.collectionView]];
-            
+
+            if ([self.delegate respondsToSelector:@selector(collectionView:longPressDidBegin:)]) {
+                [self.delegate collectionView:self.collectionView longPressDidBegin:currentIndexPath];
+            }
+
             if ([self.dataSource respondsToSelector:@selector(collectionView:canMoveItemAtIndexPath:)] &&
                ![self.dataSource collectionView:self.collectionView canMoveItemAtIndexPath:currentIndexPath]) {
                 return;
@@ -354,6 +358,11 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
                      }
                  }];
             }
+
+            if ([self.delegate respondsToSelector:@selector(collectionViewLongPressDidEnd:)]) {
+                [self.delegate collectionViewLongPressDidEnd:self.collectionView];
+            }
+
         } break;
             
         default: break;

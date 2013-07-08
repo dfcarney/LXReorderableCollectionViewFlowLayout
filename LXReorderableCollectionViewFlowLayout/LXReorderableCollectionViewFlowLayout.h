@@ -34,6 +34,9 @@
 
 @optional
 
+- (void)collectionView:(UICollectionView *)collectionView longPressDidBegin:(NSIndexPath *)indexPath;
+- (void)collectionViewLongPressDidEnd:(UICollectionView *)collectionView;
+
 - (void)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout willBeginDraggingItemAtIndexPath:(NSIndexPath *)indexPath;
 - (void)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout didBeginDraggingItemAtIndexPath:(NSIndexPath *)indexPath;
 - (void)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout willEndDraggingItemAtIndexPath:(NSIndexPath *)indexPath to:(NSIndexPath *)destinationIndexPath;
