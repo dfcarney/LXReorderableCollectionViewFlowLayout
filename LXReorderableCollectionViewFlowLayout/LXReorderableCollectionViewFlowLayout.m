@@ -46,7 +46,10 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 
 @end
 
-@interface LXReorderableCollectionViewFlowLayout ()
+@interface LXReorderableCollectionViewFlowLayout () {
+    NSMutableArray *_insertedIndexPaths;
+    NSMutableArray *_deletedIndexPaths;
+}
 
 @property (strong, nonatomic) NSIndexPath *selectedItemIndexPath;
 @property (strong, nonatomic) NSIndexPath *destinationIndexPath;
@@ -66,6 +69,87 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     _scrollingSpeed = 300.0f;
     _scrollingTriggerEdgeInsets = UIEdgeInsetsMake(50.0f, 50.0f, 50.0f, 50.0f);
 }
+
+- (void)prepareLayout {
+    _insertedIndexPaths = [NSMutableArray new];
+    _deletedIndexPaths = [NSMutableArray new];
+}
+
+- (void)prepareForCollectionViewUpdates:(NSArray*)updates
+{
+    [super prepareForCollectionViewUpdates:updates];
+    for (UICollectionViewUpdateItem *updateItem in updates) {
+        if (updateItem.updateAction ==
+            UICollectionUpdateActionInsert)
+        {
+            [_insertedIndexPaths addObject:
+             updateItem.indexPathAfterUpdate];
+        } else if (updateItem.updateAction ==
+                   UICollectionUpdateActionDelete)
+        {
+            [_deletedIndexPaths addObject:
+             updateItem.indexPathBeforeUpdate];
+        }
+    }
+}
+
+- (void)finalizeCollectionViewUpdates
+{
+    [_insertedIndexPaths removeAllObjects];
+    [_deletedIndexPaths removeAllObjects];
+}
+
+/*
+- (UICollectionViewLayoutAttributes *)initialLayoutAttributesForAppearingItemAtIndexPath:(NSIndexPath*)itemIndexPath
+{
+    if ([_insertedIndexPaths containsObject:itemIndexPath]) {
+//        UICollectionViewLayoutAttributes *attributes =
+//        [UICollectionViewLayoutAttributes
+//         layoutAttributesForCellWithIndexPath:itemIndexPath];
+
+        CGRect visibleRect =
+        (CGRect){.origin = self.collectionView.contentOffset,
+            .size = self.collectionView.bounds.size};
+        attributes.center = CGPointMake(CGRectGetMidX(visibleRect),
+                                        CGRectGetMidY(visibleRect));
+        attributes.alpha = 0.0f;
+//        attributes.transform3D = CATransform3DMakeScale(0.6f,
+//                                                        0.6f,
+//                                                        1.0f);
+
+        return attributes;
+    } else {
+        return
+        [super initialLayoutAttributesForAppearingItemAtIndexPath:
+         itemIndexPath];
+    }
+}
+
+- (UICollectionViewLayoutAttributes *)finalLayoutAttributesForDisappearingItemAtIndexPath:(NSIndexPath*)itemIndexPath
+{
+    if (false && [_deletedIndexPaths containsObject:itemIndexPath]) {
+        UICollectionViewLayoutAttributes *attributes =
+        [UICollectionViewLayoutAttributes
+         layoutAttributesForCellWithIndexPath:itemIndexPath];
+
+//        CGRect visibleRect =
+//        (CGRect){.origin = self.collectionView.contentOffset,
+//            .size = self.collectionView.bounds.size};
+//        attributes.center = CGPointMake(CGRectGetMidX(visibleRect),
+//                                        CGRectGetMidY(visibleRect));
+        attributes.alpha = 0.0f;
+//        attributes.transform3D = CATransform3DMakeScale(1.3f,
+//                                                        1.3f,
+//                                                        1.0f);
+
+        return attributes;
+    } else {
+        return
+        [super finalLayoutAttributesForDisappearingItemAtIndexPath:
+         itemIndexPath];
+    }
+}
+*/
 
 - (void)setupCollectionView {
     _longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self
