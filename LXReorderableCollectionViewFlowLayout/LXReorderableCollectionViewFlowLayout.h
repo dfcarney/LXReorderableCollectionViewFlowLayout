@@ -13,6 +13,8 @@
 @property (assign, nonatomic) UIEdgeInsets scrollingTriggerEdgeInsets;
 @property (strong, nonatomic, readonly) UILongPressGestureRecognizer *longPressGestureRecognizer;
 @property (strong, nonatomic, readonly) UIPanGestureRecognizer *panGestureRecognizer;
+@property (strong, nonatomic, readonly) UIPinchGestureRecognizer *pinchGestureRecognizer;
+
 
 - (void)setUpGestureRecognizersOnCollectionView __attribute__((deprecated("Calls to setUpGestureRecognizersOnCollectionView method are not longer needed as setup are done automatically through KVO.")));
 
@@ -21,6 +23,10 @@
 @protocol LXReorderableCollectionViewDataSource <UICollectionViewDataSource>
 
 - (void)collectionView:(UICollectionView *)collectionView itemAtIndexPath:(NSIndexPath *)fromIndexPath willMoveToIndexPath:(NSIndexPath *)toIndexPath;
+
+// For pinch-out
+- (CGSize)maxZoomReferenceSize;
+- (UIImage *)imageForItemAtIndexPath:(NSIndexPath *)indexPath;
 
 @optional
 
@@ -44,5 +50,7 @@
 @required
 
 - (void)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout didEndDraggingItemAtIndexPath:(NSIndexPath *)indexPath to:(NSIndexPath *)destinationIndexPath;
+
+- (void)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout didPinchOpenItemAtIndexPath:(NSIndexPath *)indexPath withInterstitialView:(UIView *)interstitialView;
 
 @end

@@ -10,6 +10,9 @@
 
 #define LX_FRAMES_PER_SECOND 60.0
 
+static const CGFloat kPinchMinScale = 1.0f;
+static const CGFloat kPinchMaxScale = 4.0f;
+
 #ifndef CGGEOMETRY_LXSUPPORT_H_
 CG_INLINE CGPoint
 LXS_CGPointAdd(CGPoint point1, CGPoint point2) {
@@ -60,6 +63,10 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 
 @property (assign, nonatomic, readonly) id<LXReorderableCollectionViewDataSource> dataSource;
 @property (assign, nonatomic, readonly) id<LXReorderableCollectionViewDelegateFlowLayout> delegate;
+
+@property (nonatomic, assign) BOOL pinching;
+@property (nonatomic, assign) CGFloat pinchScale;
+@property (nonatomic, assign) CGPoint pinchCenter;
 
 @end
 
@@ -151,12 +158,28 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 }
 */
 
+- (void)setPinchScale:(CGFloat)pinchScale {
+    _pinchScale = pinchScale;
+//    [self invalidateLayout];
+}
+
+- (void)setPinchCenter:(CGPoint)pinchCenter {
+    _pinchCenter = pinchCenter;
+//    [self invalidateLayout];
+}
+
 - (void)setupCollectionView {
     _longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self
                                                                                 action:@selector(handleLongPressGesture:)];
     _longPressGestureRecognizer.delegate = self;
     [self.collectionView addGestureRecognizer:_longPressGestureRecognizer];
-    
+
+    self.pinching = NO;
+    _pinchGestureRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self
+                                                                        action:@selector(handlePinchGesture:)];
+    _pinchGestureRecognizer.delegate = self;
+    [self.collectionView addGestureRecognizer:_pinchGestureRecognizer];
+
     // Links the default long press gesture recognizer to the custom long press gesture recognizer we are creating now
     // by enforcing failure dependency so that they doesn't clash.
     // In other words, our long-press recognizer takes precedence.
@@ -195,10 +218,17 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     [self removeObserver:self forKeyPath:kLXCollectionViewKeyPath];
 }
 
-- (void)applyLayoutAttributes:(UICollectionViewLayoutAttributes *)layoutAttributes {
-    if ([layoutAttributes.indexPath isEqual:self.selectedItemIndexPath]) {
+- (void)applyLayoutAttributes:(UICollectionViewLayoutAttributes *)attributes {
+    if ([attributes.indexPath isEqual:self.selectedItemIndexPath]) {
         // dfcarney: makes for nicer animation at gesture end
-        // layoutAttributes.hidden = YES;
+        // attributes.hidden = YES;
+
+//        CGFloat scale = self.pinchScale;
+//        CATransform3D transform = CATransform3DMakeScale(scale, scale, 1.f);
+//        attributes.transform3D = transform;
+//        attributes.zIndex = 1;
+    } else {
+        attributes.zIndex = 0;
     }
 }
 
@@ -334,6 +364,126 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     self.collectionView.contentOffset = LXS_CGPointAdd(contentOffset, translation);
 }
 
+- (void)handlePinchGesture:(UIPinchGestureRecognizer *)gestureRecognizer {
+    switch(gestureRecognizer.state) {
+        case UIGestureRecognizerStateBegan: {
+            self.pinching = YES;
+            
+            NSIndexPath *currentIndexPath = [self.collectionView indexPathForItemAtPoint:[gestureRecognizer locationInView:self.collectionView]];
+            self.selectedItemIndexPath = currentIndexPath;
+
+            if (self.selectedItemIndexPath) {
+                self.pinchCenter = [gestureRecognizer locationInView:self.collectionView];
+
+                UICollectionViewCell *collectionViewCell = [self.collectionView cellForItemAtIndexPath:self.selectedItemIndexPath];
+
+                self.currentView = [[UIView alloc] initWithFrame:collectionViewCell.frame];
+
+                UIImage *image = [collectionViewCell LX_rasterizedImage];
+                UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
+                imageView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                imageView.contentMode = UIViewContentModeScaleAspectFit;
+                imageView.alpha = 1.0f;
+
+                [self.currentView addSubview:imageView];
+                [[self.collectionView superview] addSubview:self.currentView];
+
+                self.currentViewCenter = self.currentView.center;
+            }
+        }
+        break;
+        case UIGestureRecognizerStateChanged: {
+            CGPoint point = [gestureRecognizer locationInView:self.collectionView];
+//            self.pinchScale = gestureRecognizer.scale;
+
+            CGFloat theScale = gestureRecognizer.scale;
+            theScale = MIN(theScale, kPinchMaxScale);
+            theScale = MAX(theScale, kPinchMinScale);
+            
+            self.pinchScale = theScale;
+
+            CGAffineTransform transform = CGAffineTransformMakeScale(self.pinchScale, self.pinchScale);
+            self.currentView.transform = transform;
+
+            CGFloat theScalePct = (self.pinchScale - kPinchMinScale) / (kPinchMaxScale - kPinchMinScale);
+            self.collectionView.alpha = 1.f - theScalePct;
+        }
+        break;
+        default: {
+            CGFloat theScalePct = (self.pinchScale - kPinchMinScale) / (kPinchMaxScale - kPinchMinScale);
+            if (theScalePct > 0.80) {
+                __weak typeof(self) weakSelf = self;
+                [UIView
+                 animateWithDuration:0.2
+                 delay:0.0
+                 options:UIViewAnimationOptionBeginFromCurrentState
+                 animations:^{
+                     __strong typeof(self) strongSelf = weakSelf;
+                     if (strongSelf) {
+
+//                         CGAffineTransform transform = CGAffineTransformMakeScale(kPinchMaxScale, kPinchMaxScale);
+//                         strongSelf.currentView.transform = transform;
+//                         strongSelf.pinchScale = kPinchMaxScale;
+
+                         CGAffineTransform transform = CGAffineTransformIdentity;
+                         strongSelf.currentView.transform = transform;
+
+                         CGRect bounds = strongSelf.currentView.bounds;
+                         CGSize maxSize = [strongSelf.dataSource maxZoomReferenceSize];
+                         bounds.size = maxSize;
+                         strongSelf.currentView.bounds = bounds;
+
+                         UIImageView *imageView = [strongSelf.currentView subviews][0];
+                         imageView.image = [self.dataSource imageForItemAtIndexPath:self.selectedItemIndexPath];
+
+                         strongSelf.currentView.alpha = 1.f;
+                         strongSelf.collectionView.alpha = 0.f;
+                         strongSelf.currentView.center = self.collectionView.center;
+                     }
+                 }
+                 completion:^(BOOL finished) {
+                     __strong typeof(self) strongSelf = weakSelf;
+                     if (strongSelf) {
+                         [strongSelf.delegate collectionView:self.collectionView layout:self didPinchOpenItemAtIndexPath:self.selectedItemIndexPath withInterstitialView:self.currentView];
+
+                         // rely on the delegate to removeFromSuperview
+                         // [strongSelf.currentView removeFromSuperview];
+                         
+                         strongSelf.currentView = nil;
+                         strongSelf.selectedItemIndexPath = nil;
+                         strongSelf.pinching = NO;
+                     }
+                 }];
+            } else {
+                __weak typeof(self) weakSelf = self;
+                [UIView
+                 animateWithDuration:0.3
+                 delay:0.0
+                 options:UIViewAnimationOptionBeginFromCurrentState
+                 animations:^{
+                     __strong typeof(self) strongSelf = weakSelf;
+                     if (strongSelf) {
+                         CGAffineTransform transform = CGAffineTransformIdentity;
+                         strongSelf.currentView.transform = transform;
+                         strongSelf.pinchScale = 1.0;
+                         strongSelf.currentView.alpha = 0.f;
+                         strongSelf.collectionView.alpha = 1.0;
+                     }
+                 }
+                 completion:^(BOOL finished) {
+                     __strong typeof(self) strongSelf = weakSelf;
+                     if (strongSelf) {
+                         [strongSelf.currentView removeFromSuperview];
+                         strongSelf.currentView = nil;
+                         strongSelf.selectedItemIndexPath = nil;
+                         strongSelf.pinching = NO;
+                     }
+                 }];
+            }
+        }
+    }
+}
+
 
 - (void)handleLongPressGesture:(UILongPressGestureRecognizer *)gestureRecognizer {
     switch(gestureRecognizer.state) {
@@ -393,6 +543,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
                  __strong typeof(self) strongSelf = weakSelf;
                  if (strongSelf) {
                      [highlightedImageView removeFromSuperview];
+
                      
                      if ([strongSelf.delegate respondsToSelector:@selector(collectionView:layout:didBeginDraggingItemAtIndexPath:)]) {
                          [strongSelf.delegate collectionView:strongSelf.collectionView layout:strongSelf didBeginDraggingItemAtIndexPath:strongSelf.selectedItemIndexPath];
@@ -454,45 +605,60 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 }
 
 - (void)handlePanGesture:(UIPanGestureRecognizer *)gestureRecognizer {
-    switch (gestureRecognizer.state) {
-        case UIGestureRecognizerStateBegan:
-        case UIGestureRecognizerStateChanged: {
-            self.panTranslationInCollectionView = [gestureRecognizer translationInView:self.collectionView];
-            CGPoint viewCenter = self.currentView.center = LXS_CGPointAdd(self.currentViewCenter, self.panTranslationInCollectionView);
-            
-            [self invalidateLayoutIfNecessary];
-            
-            switch (self.scrollDirection) {
-                case UICollectionViewScrollDirectionVertical: {
-                    if (viewCenter.y < (CGRectGetMinY(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.top)) {
-                        [self setupScrollTimerInDirection:LXScrollingDirectionUp];
-                    } else {
-                        if (viewCenter.y > (CGRectGetMaxY(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.bottom)) {
-                            [self setupScrollTimerInDirection:LXScrollingDirectionDown];
-                        } else {
-                            [self invalidatesScrollTimer];
-                        }
-                    }
-                } break;
-                case UICollectionViewScrollDirectionHorizontal: {
-                    if (viewCenter.x < (CGRectGetMinX(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.left)) {
-                        [self setupScrollTimerInDirection:LXScrollingDirectionLeft];
-                    } else {
-                        if (viewCenter.x > (CGRectGetMaxX(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.right)) {
-                            [self setupScrollTimerInDirection:LXScrollingDirectionRight];
-                        } else {
-                            [self invalidatesScrollTimer];
-                        }
-                    }
-                } break;
+    if (self.pinching) {
+        switch (gestureRecognizer.state) {
+            case UIGestureRecognizerStateBegan:
+            case UIGestureRecognizerStateChanged: {
+                self.panTranslationInCollectionView = [gestureRecognizer translationInView:self.collectionView];
+                self.currentView.center = LXS_CGPointAdd(self.currentViewCenter, self.panTranslationInCollectionView);
             }
-        } break;
-        case UIGestureRecognizerStateEnded: {
-            [self invalidatesScrollTimer];
-        } break;
-        default: {
-            // Do nothing...
-        } break;
+//            case UIGestureRecognizerStateEnded: {
+//            } break;
+            default: {
+                // Do nothing...
+            } break;
+        }
+    } else {
+        switch (gestureRecognizer.state) {
+            case UIGestureRecognizerStateBegan:
+            case UIGestureRecognizerStateChanged: {
+                self.panTranslationInCollectionView = [gestureRecognizer translationInView:self.collectionView];
+                CGPoint viewCenter = self.currentView.center = LXS_CGPointAdd(self.currentViewCenter, self.panTranslationInCollectionView);
+                
+                [self invalidateLayoutIfNecessary];
+                
+                switch (self.scrollDirection) {
+                    case UICollectionViewScrollDirectionVertical: {
+                        if (viewCenter.y < (CGRectGetMinY(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.top)) {
+                            [self setupScrollTimerInDirection:LXScrollingDirectionUp];
+                        } else {
+                            if (viewCenter.y > (CGRectGetMaxY(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.bottom)) {
+                                [self setupScrollTimerInDirection:LXScrollingDirectionDown];
+                            } else {
+                                [self invalidatesScrollTimer];
+                            }
+                        }
+                    } break;
+                    case UICollectionViewScrollDirectionHorizontal: {
+                        if (viewCenter.x < (CGRectGetMinX(self.collectionView.bounds) + self.scrollingTriggerEdgeInsets.left)) {
+                            [self setupScrollTimerInDirection:LXScrollingDirectionLeft];
+                        } else {
+                            if (viewCenter.x > (CGRectGetMaxX(self.collectionView.bounds) - self.scrollingTriggerEdgeInsets.right)) {
+                                [self setupScrollTimerInDirection:LXScrollingDirectionRight];
+                            } else {
+                                [self invalidatesScrollTimer];
+                            }
+                        }
+                    } break;
+                }
+            } break;
+            case UIGestureRecognizerStateEnded: {
+                [self invalidatesScrollTimer];
+            } break;
+            default: {
+                // Do nothing...
+            } break;
+        }
     }
 }
 
@@ -547,7 +713,15 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     if ([self.panGestureRecognizer isEqual:gestureRecognizer]) {
         return [self.longPressGestureRecognizer isEqual:otherGestureRecognizer];
     }
-    
+
+    if ([self.pinchGestureRecognizer isEqual:gestureRecognizer]) {
+        return [self.panGestureRecognizer isEqual:otherGestureRecognizer];
+    }
+
+    if ([self.panGestureRecognizer isEqual:gestureRecognizer]) {
+        return [self.pinchGestureRecognizer isEqual:otherGestureRecognizer];
+    }
+
     return NO;
 }
 
