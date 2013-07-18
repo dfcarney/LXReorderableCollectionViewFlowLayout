@@ -82,8 +82,7 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     _deletedIndexPaths = [NSMutableArray new];
 }
 
-- (void)prepareForCollectionViewUpdates:(NSArray*)updates
-{
+- (void)prepareForCollectionViewUpdates:(NSArray*)updates {
     [super prepareForCollectionViewUpdates:updates];
     for (UICollectionViewUpdateItem *updateItem in updates) {
         if (updateItem.updateAction ==
@@ -100,63 +99,50 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
     }
 }
 
-- (void)finalizeCollectionViewUpdates
-{
+- (void)finalizeCollectionViewUpdates {
     [_insertedIndexPaths removeAllObjects];
     [_deletedIndexPaths removeAllObjects];
 }
 
-/*
-- (UICollectionViewLayoutAttributes *)initialLayoutAttributesForAppearingItemAtIndexPath:(NSIndexPath*)itemIndexPath
+- (UICollectionViewLayoutAttributes *)initialLayoutAttributesForAppearingItemAtIndexPath:(NSIndexPath*)indexPath
 {
-    if ([_insertedIndexPaths containsObject:itemIndexPath]) {
+    UICollectionViewLayoutAttributes *attributes;
+    if ([_insertedIndexPaths containsObject:indexPath]) {
+        attributes = [self layoutAttributesForItemAtIndexPath:indexPath];
+        attributes.transform3D = CATransform3DMakeTranslation(0.0, 10.f, 0);
+        attributes.alpha = 0.f;
+        return attributes;
+    } else {
+        attributes = [super initialLayoutAttributesForAppearingItemAtIndexPath:indexPath];
+        return attributes;
+    }
+}
+
+- (UICollectionViewLayoutAttributes *)finalLayoutAttributesForDisappearingItemAtIndexPath:(NSIndexPath*)indexPath {
+    UICollectionViewLayoutAttributes *attributes = [super finalLayoutAttributesForDisappearingItemAtIndexPath:indexPath];    
+    return attributes;
+//    if ([_deletedIndexPaths containsObject:itemIndexPath]) {
 //        UICollectionViewLayoutAttributes *attributes =
 //        [UICollectionViewLayoutAttributes
 //         layoutAttributesForCellWithIndexPath:itemIndexPath];
-
-        CGRect visibleRect =
-        (CGRect){.origin = self.collectionView.contentOffset,
-            .size = self.collectionView.bounds.size};
-        attributes.center = CGPointMake(CGRectGetMidX(visibleRect),
-                                        CGRectGetMidY(visibleRect));
-        attributes.alpha = 0.0f;
-//        attributes.transform3D = CATransform3DMakeScale(0.6f,
-//                                                        0.6f,
-//                                                        1.0f);
-
-        return attributes;
-    } else {
-        return
-        [super initialLayoutAttributesForAppearingItemAtIndexPath:
-         itemIndexPath];
-    }
+//
+////        CGRect visibleRect =
+////        (CGRect){.origin = self.collectionView.contentOffset,
+////            .size = self.collectionView.bounds.size};
+////        attributes.center = CGPointMake(CGRectGetMidX(visibleRect),
+////                                        CGRectGetMidY(visibleRect));
+//        attributes.alpha = 0.0f;
+////        attributes.transform3D = CATransform3DMakeScale(1.3f,
+////                                                        1.3f,
+////                                                        1.0f);
+//
+//        return attributes;
+//    } else {
+//        return
+//        [super finalLayoutAttributesForDisappearingItemAtIndexPath:
+//         itemIndexPath];
+//    }
 }
-
-- (UICollectionViewLayoutAttributes *)finalLayoutAttributesForDisappearingItemAtIndexPath:(NSIndexPath*)itemIndexPath
-{
-    if (false && [_deletedIndexPaths containsObject:itemIndexPath]) {
-        UICollectionViewLayoutAttributes *attributes =
-        [UICollectionViewLayoutAttributes
-         layoutAttributesForCellWithIndexPath:itemIndexPath];
-
-//        CGRect visibleRect =
-//        (CGRect){.origin = self.collectionView.contentOffset,
-//            .size = self.collectionView.bounds.size};
-//        attributes.center = CGPointMake(CGRectGetMidX(visibleRect),
-//                                        CGRectGetMidY(visibleRect));
-        attributes.alpha = 0.0f;
-//        attributes.transform3D = CATransform3DMakeScale(1.3f,
-//                                                        1.3f,
-//                                                        1.0f);
-
-        return attributes;
-    } else {
-        return
-        [super finalLayoutAttributesForDisappearingItemAtIndexPath:
-         itemIndexPath];
-    }
-}
-*/
 
 - (void)setPinchScale:(CGFloat)pinchScale {
     _pinchScale = pinchScale;
@@ -683,7 +669,6 @@ static NSString * const kLXCollectionViewKeyPath = @"collectionView";
 
 - (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath {
     UICollectionViewLayoutAttributes *layoutAttributes = [super layoutAttributesForItemAtIndexPath:indexPath];
-    
     switch (layoutAttributes.representedElementCategory) {
         case UICollectionElementCategoryCell: {
             [self applyLayoutAttributes:layoutAttributes];
